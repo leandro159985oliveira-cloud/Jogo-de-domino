@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dominó Master - Corrigido</title>
+    <style>
+        :root {
+            --bg-table: #0a3d12;
+            --tile-white: #ffffff;
+            --tile-back: #1a237e;
+            --accent: #ffcc00;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #051d08;
+            margin: 0;
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* BARRA DE STATS TOPO */
+        #top-stats {
+            background: #000; padding: 8px; font-size: 0.8rem;
+            display: flex; justify-content: center; gap: 20px; border-bottom: 1px solid #222;
+        }
+        .stat-val { color: var(--accent); font-weight: bold; }
+
+        /* MENU */
+        #menu {
+            position: fixed; inset: 0;
+            background: radial-gradient(circle, #1a4a1e, #051d08);
+            z-index: 1000; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+        }
+
+        .menu-btn {
+            padding: 15px 40px; margin: 10px; font-size: 1.1rem;
+            cursor: pointer; background: var(--accent); border: none;
+            border-radius: 8px; font-weight: bold; box-shadow: 0 4px #b89400; width: 250px;
+        }
+
+        /* MESA */
+        #game-table {
+            display: none; flex: 1; grid-template-columns: 100px 1fr 100px; grid-template-rows: auto 1fr;
+            background: radial-gradient(circle, var(--bg-table), #051d08);
+            position: relative; overflow: hidden;
+        }
+
+        .seat { display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+        #seat-top { grid-column: 2; grid-row: 1; padding: 10px; }
+        #seat-left { grid-column: 1; grid-row: 2; }
+        #seat-right { grid-column: 3; grid-row: 2; }
+
+        #board-container {
+            grid-column: 2; grid-row: 2; overflow: auto;
+            display: flex; justify-content: center; align-items: center;
+            padding: 20px; padding-bottom: 120px; scroll-behavior: smooth;
+        }
+
+        #board { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; max-width: 600px; min-height: 100px; }
+
+        #seat-bottom {
+            height: 160px; background: rgba(0,0,0,0.9);
+            border-top: 3px solid var(--accent); display: none;
+            flex-direction: column; align-items: center; justify-content: center; width: 100%;
+            z-index: 100;
+        }
+
+        /* SELETOR DE LADO */
+        #side-selector {
+            position: absolute; bottom: 180px; left: 50%; transform: translateX(-50%);
+            display: none; gap: 20px; z-index: 500; background: rgba(0,0,0,0.95);
+            padding: 20px; border-radius: 15px; border: 2px solid var(--accent);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+        .side-btn {
+            padding: 15px 25px; background: var(--accent); border: none;
+            border-radius: 8px; font-weight: bold; cursor: pointer; color: black;
+        }
+
+        /* PEÇAS */
+        .tile {
+            background: var(--tile-white); color: #222; border-radius: 5px;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: 900; box-shadow: 2px 4px 8px rgba(0,0,0,0.5); flex-shrink: 0;
+            border: 1px solid #ddd;
+        }
+        .tile.horizontal { width: 66px; height: 36px; flex-direction: row; }
+        .tile.vertical { width: 36px; height: 66px; flex-direction: column; }
+        .board-double { border: 2px solid var(--accent) !important; }
+
+        .hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+        .hand .tile { width: 22px; height: 36px; font-size: 0.7rem; border-radius: 3px; }
+        .player-hand { display: flex; gap: 10px; padding: 10px; overflow-x: auto; max-width: 95vw; }
+        .player-hand .tile { width: 48px; height: 75px; font-size: 1.4rem; cursor: pointer; transition: transform 0.2s; }
+        .player-hand .tile:hover { transform: translateY(-10px); }
+        
+        .tile.cpu-hidden { background: var(--tile-back); color: transparent; border-color: #000; }
+
+        .divider { background: #888; }
+        .horizontal .divider { width: 1px; height: 70%; margin: 0 5px; }
+        .vertical .divider { width: 70%; height: 1px; margin: 5px 0; }
+
+        /* MODAIS */
+        .modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+            z-index: 2000; display: none; flex-direction: column;
+            justify-content: center; align-items: center; text-align: center;
+        }
+        .modal-content {
+            background: #1a4a1e; padding: 25px; border-radius: 15px;
+            border: 3px solid var(--accent); width: 90%; max-width: 400px;
+            position: relative;
+        }
+
+        .btn-reset-small {
+            position: absolute; top: 10px; right: 10px;
+            background: #800; color: white; border: none;
+            border-radius: 4px; padding: 5px 10px; font-size: 0.65rem;
+            cursor: pointer; font-weight: bold;
+        }
+
+        .stats-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        .stats-table th { color: var(--accent); border-bottom: 1px solid #444; padding: 8px; }
+        .stats-table td { padding: 8px; border-bottom: 1px solid #222; }
+
+        #hud { background: #000; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .game-btn { padding: 8px 12px; background: var(--accent); border: none; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .game-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .active-seat { color: var(--accent) !important; text-shadow: 0 0 10px var(--accent); font-weight: bold; }
+        .name { color: #aaa; margin-bottom: 5px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div id="top-stats">
+    <span>VITÓRIAS: <span id="ts-wins" class="stat-val">0</span></span>
+    <span>SEQUÊNCIA: <span id="ts-streak" class="stat-val">0</span> 🔥</span>
+</div>
+
+<div id="menu">
+    <h1 style="color: var(--accent); margin-bottom: 30px; text-shadow: 2px 2px #000;">DOMINÓ MASTER</h1>
+    <button class="menu-btn" onclick="startGame(2)">1 vs 1</button>
+    <button class="menu-btn" onclick="startGame(3)">1 vs 2</button>
+    <button class="menu-btn" onclick="startGame(4)">1 vs 3</button>
+    <button class="menu-btn" style="background:#444;" onclick="openStats()">ESTATÍSTICAS</button>
+</div>
+
+<div id="stats-modal" class="modal">
+    <div class="modal-content">
+        <button class="btn-reset-small" onclick="resetStats()">ZERAR TUDO</button>
+        <h2 style="color:var(--accent);">DESEMPENHO</h2>
+        <table class="stats-table">
+            <thead><tr><th>MODO</th><th>V</th><th>D</th><th>E</th></tr></thead>
+            <tbody id="stats-body"></tbody>
+        </table>
+        <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; margin-bottom: 20px;">
+            <div style="font-size: 0.8rem; color: #aaa;">RECORDE DE SEQUÊNCIA</div>
+            <div id="m-best-streak" style="font-size: 1.5rem; color: var(--accent); font-weight: bold;">0</div>
+        </div>
+        <button class="menu-btn" onclick="closeStats()" style="width: 100%;">VOLTAR</button>
+    </div>
+</div>
+
+<div id="victory-modal" class="modal">
+    <div class="modal-content">
+        <h1 id="winner-text" style="color: var(--accent);">VITÓRIA!</h1>
+        <p id="winner-name" style="font-size: 1.2rem; margin: 10px 0;"></p>
+        <p id="round-pts-display" style="opacity: 0.8; margin-bottom: 20px;"></p>
+        <button class="menu-btn" onclick="restartRound()">JOGAR NOVAMENTE</button>
+        <button class="menu-btn" onclick="backToMenu()" style="background:#666;">VOLTAR AO MENU</button>
+    </div>
+</div>
+
+<div id="side-selector">
+    <div style="margin-bottom: 15px; font-weight: bold; color: var(--accent); text-align: center;">ONDE ENCAIXAR?</div>
+    <div style="display: flex; gap: 15px;">
+        <button class="side-btn" onclick="playOnChosenSide('left')">ESQUERDA</button>
+        <button class="side-btn" onclick="playOnChosenSide('right')">DIREITA</button>
+    </div>
+</div>
+
+<div id="hud">
+    <div id="turn-display" style="color: var(--accent); font-weight: bold;">AGUARDANDO...</div>
+    <div>MONTE: <span id="deck-count">0</span></div>
+    <div style="display: flex; gap: 5px;">
+        <button id="draw-btn" class="game-btn" onclick="playerDraw()">COMPRAR</button>
+        <button id="pass-btn" class="game-btn" onclick="passTurn()" style="display:none; background:#ff4444; color:white;">PASSAR</button>
+    </div>
+</div>
+
+<div id="game-table">
+    <div id="seat-top" class="seat"><div class="name">Carlos</div><div id="hand-cpu-1" class="hand"></div></div>
+    <div id="seat-left" class="seat"><div class="name">Ana</div><div id="hand-cpu-2" class="hand" style="flex-direction:column"></div></div>
+    <div id="board-container"><div id="board"></div></div>
+    <div id="seat-right" class="seat"><div class="name">Beto</div><div id="hand-cpu-3" class="hand" style="flex-direction:column"></div></div>
+</div>
+
+<div id="seat-bottom">
+    <div id="hand-player" class="player-hand"></div>
+    <div class="name" style="margin-top:5px; color:var(--accent)">SUA MÃO</div>
+</div>
+
+<script>
+    let deck = [], board = [], players = [], turn = 0, gameActive = false;
+    let lastWinnerId = -1, pendingMove = null, currentMode = 0;
+    const cpuNames = ["Carlos", "Ana", "Beto"];
+
+    let stats = JSON.parse(localStorage.getItem('dominoStats')) || {
+        overall: { wins: 0, streak: 0, bestStreak: 0 },
+        m1v1: { wins: 0, losses: 0, draws: 0 },
+        m1v2: { wins: 0, losses: 0, draws: 0 },
+        m1v3: { wins: 0, losses: 0, draws: 0 }
+    };
+
+    function saveStats() {
+        localStorage.setItem('dominoStats', JSON.stringify(stats));
+        updateTopStats();
+    }
+
+    function updateTopStats() {
+        document.getElementById('ts-wins').innerText = stats.overall.wins;
+        document.getElementById('ts-streak').innerText = stats.overall.streak;
+    }
+
+    function resetStats() {
+        if(confirm("Deseja apagar todo o seu histórico?")) {
+            stats = {
+                overall: { wins: 0, streak: 0, bestStreak: 0 },
+                m1v1: { wins: 0, losses: 0, draws: 0 },
+                m1v2: { wins: 0, losses: 0, draws: 0 },
+                m1v3: { wins: 0, losses: 0, draws: 0 }
+            };
+            saveStats();
+            openStats();
+        }
+    }
+
+    function startGame(num) {
+        currentMode = num;
+        players = [{ id: 0, name: "Você", hand: [], isCPU: false, seat: "bottom" }];
+        
+        // Reset de visibilidade
+        document.querySelectorAll('.seat').forEach(s => s.style.opacity = '0');
+
+        for(let i = 1; i < num; i++) {
+            let seatId = ["top", "left", "right"][i-1];
+            players.push({ id: i, name: cpuNames[i-1], hand: [], isCPU: true, seat: seatId });
+            document.getElementById(`seat-${seatId}`).style.opacity = '1';
+        }
+
+        document.getElementById('menu').style.display = 'none';
+        document.getElementById('game-table').style.display = 'grid';
+        document.getElementById('seat-bottom').style.display = 'flex';
+        updateTopStats();
+        restartRound();
+    }
+
+    function backToMenu() {
+        document.getElementById('victory-modal').style.display = 'none';
+        document.getElementById('game-table').style.display = 'none';
+        document.getElementById('seat-bottom').style.display = 'none';
+        document.getElementById('menu').style.display = 'flex';
+        gameActive = false;
+    }
+
+    function restartRound() {
+        document.getElementById('victory-modal').style.display = 'none';
+        deck = [];
+        for (let i = 0; i <= 6; i++) for (let j = i; j <= 6; j++) deck.push({v1: i, v2: j, weight: i+j});
+        deck.sort(() => Math.random() - 0.5);
+        board = [];
+        players.forEach(p => p.hand = deck.splice(0, 7));
+        
+        gameActive = true;
+        pendingMove = null;
+        document.getElementById('side-selector').style.display = 'none';
+
+        if(lastWinnerId === -1) {
+            turn = 0; 
+            for(let v=6; v>=0; v--) {
+                let found = players.findIndex(p => p.hand.some(t => t.v1 === v && t.v2 === v));
+                if(found !== -1) { turn = found; break; }
+            }
+        } else { turn = lastWinnerId; }
+
+        updateUI();
+        if(players[turn].isCPU) setTimeout(cpuLogic, 1000);
+    }
+
+    function updateUI() {
+        updateTopStats();
+        const bDiv = document.getElementById('board');
+        bDiv.innerHTML = '';
+        board.forEach((t, i) => {
+            const el = document.createElement('div');
+            el.className = `tile ${t.v1 === t.v2 ? 'vertical board-double' : 'horizontal'}`;
+            el.innerHTML = `<span>${t.v1}</span><div class="divider"></div><span>${t.v2}</span>`;
+            if(i === board.length-1) el.id = "last-tile";
+            bDiv.appendChild(el);
+        });
+
+        players.forEach(p => {
+            const container = document.getElementById(p.isCPU ? `hand-cpu-${p.id}` : 'hand-player');
+            if(!container) return;
+            container.innerHTML = '';
+            p.hand.forEach((t, i) => {
+                const el = document.createElement('div');
+                el.className = `tile vertical ${p.isCPU ? 'cpu-hidden' : ''}`;
+                el.innerHTML = `<span>${t.v1}</span><div class="divider"></div><span>${t.v2}</span>`;
+                if(!p.isCPU) el.onclick = () => playerMove(i);
+                container.appendChild(el);
+            });
+            const seatEl = document.getElementById(`seat-${p.seat}`);
+            const nameDiv = seatEl ? seatEl.querySelector('.name') : document.querySelector('#seat-bottom .name');
+            if(nameDiv) {
+                if(turn === p.id) nameDiv.classList.add('active-seat');
+                else nameDiv.classList.remove('active-seat');
+            }
+        });
+
+        document.getElementById('deck-count').innerText = deck.length;
+        document.getElementById('turn-display').innerText = turn === 0 ? "SUA VEZ" : `VEZ DE ${players[turn].name.toUpperCase()}`;
+        
+        const canMove = hasValidMove(players[0].hand);
+        document.getElementById('draw-btn').disabled = (turn !== 0 || deck.length === 0 || board.length === 0 || pendingMove);
+        document.getElementById('pass-btn').style.display = (turn === 0 && !canMove && deck.length === 0 && board.length > 0) ? 'block' : 'none';
+        
+        setTimeout(() => document.getElementById('last-tile')?.scrollIntoView({behavior: 'smooth', block: 'center'}), 100);
+    }
+
+    function hasValidMove(hand) {
+        if(board.length === 0) return hand.some(t => t.v1 === t.v2);
+        const l = board[0].v1, r = board[board.length-1].v2;
+        return hand.some(t => t.v1 === l || t.v2 === l || t.v1 === r || t.v2 === r);
+    }
+
+    function playerMove(idx) {
+        if(turn !== 0 || !gameActive || pendingMove) return;
+        const tile = players[0].hand[idx];
+        if(board.length === 0) {
+            if(tile.v1 === tile.v2) { 
+                executePlay(tile, idx, 'right');
+                nextTurn(); 
+            }
+            return;
+        }
+        const l = board[0].v1, r = board[board.length-1].v2;
+        const fitsLeft = (tile.v1 === l || tile.v2 === l);
+        const fitsRight = (tile.v1 === r || tile.v2 === r);
+        if(fitsLeft && fitsRight) { pendingMove = { tile, idx }; document.getElementById('side-selector').style.display = 'block'; }
+        else if(fitsLeft) { executePlay(tile, idx, 'left'); nextTurn(); }
+        else if(fitsRight) { executePlay(tile, idx, 'right'); nextTurn(); }
+    }
+
+    function playOnChosenSide(side) {
+        if(!pendingMove) return;
+        executePlay(pendingMove.tile, pendingMove.idx, side);
+        document.getElementById('side-selector').style.display = 'none';
+        pendingMove = null;
+        nextTurn();
+    }
+
+    function executePlay(tile, tIdx, side) {
+        if(board.length === 0) {
+            board.push(tile);
+        } else if(side === 'right') {
+            const r = board[board.length-1].v2;
+            if (tile.v1 === r) board.push({v1: tile.v1, v2: tile.v2});
+            else board.push({v1: tile.v2, v2: tile.v1});
+        } else {
+            const l = board[0].v1;
+            if (tile.v2 === l) board.unshift({v1: tile.v1, v2: tile.v2});
+            else board.unshift({v1: tile.v2, v2: tile.v1});
+        }
+        players[turn].hand.splice(tIdx, 1);
+        if(players[turn].hand.length === 0) finishRound(players[turn]);
+    }
+
+    function nextTurn() {
+        if(!gameActive) return;
+        if(board.length > 0 && !players.some(p => hasValidMove(p.hand)) && deck.length === 0) return handleLock();
+        turn = (turn + 1) % players.length;
+        updateUI();
+        if(gameActive && players[turn].isCPU) setTimeout(cpuLogic, 1000);
+    }
+
+    function cpuLogic() {
+        if(!gameActive) return;
+        const cpu = players[turn];
+        let moves = cpu.hand.map((t, i) => ({t, i})).filter(m => {
+            if(board.length === 0) return m.t.v1 === m.t.v2;
+            const l = board[0].v1, r = board[board.length-1].v2;
+            return m.t.v1 === l || m.t.v2 === l || m.t.v1 === r || m.t.v2 === r;
+        });
+        if(moves.length > 0) {
+            moves.sort((a,b) => b.t.weight - a.t.weight);
+            const m = moves[0];
+            if(board.length === 0) executePlay(m.t, m.i, 'right');
+            else {
+                const l = board[0].v1, r = board[board.length-1].v2;
+                if(m.t.v1 === r || m.t.v2 === r) executePlay(m.t, m.i, 'right');
+                else executePlay(m.t, m.i, 'left');
+            }
+            if(gameActive) nextTurn();
+        } else if(deck.length > 0 && board.length > 0) {
+            cpu.hand.push(deck.pop());
+            updateUI();
+            setTimeout(cpuLogic, 600);
+        } else nextTurn();
+    }
+
+    function handleLock() {
+        let scores = players.map(p => ({p, pts: p.hand.reduce((a,t)=>a+t.v1+t.v2, 0)}));
+        scores.sort((a,b) => a.pts - b.pts);
+        if(scores[0].pts === scores[1].pts) finishRound(null);
+        else finishRound(scores[0].p);
+    }
+
+    function finishRound(winner) {
+        gameActive = false;
+        const modeKey = `m1v${currentMode - 1}`;
+
+        if(!winner) {
+            stats[modeKey].draws++;
+            stats.overall.streak = 0;
+            document.getElementById('winner-text').innerText = "EMPATE!";
+            document.getElementById('winner-name').innerText = "O jogo trancou!";
+        } else {
+            lastWinnerId = winner.id;
+            let pts = players.reduce((a,p) => a + p.hand.reduce((a2,t)=>a2+t.v1+t.v2,0), 0);
+            document.getElementById('round-pts-display').innerText = `Pontos na mesa: ${pts}`;
+
+            if(winner.id === 0) {
+                stats[modeKey].wins++;
+                stats.overall.wins++;
+                stats.overall.streak++;
+                if(stats.overall.streak > stats.overall.bestStreak) stats.overall.bestStreak = stats.overall.streak;
+                document.getElementById('winner-text').innerText = "VITÓRIA!";
+            } else {
+                stats[modeKey].losses++;
+                stats.overall.streak = 0;
+                document.getElementById('winner-text').innerText = "DERROTA!";
+            }
+            document.getElementById('winner-name').innerText = `${winner.name} venceu!`;
+        }
+        saveStats();
+        updateUI();
+        setTimeout(() => { if(!gameActive) document.getElementById('victory-modal').style.display = 'flex'; }, 600);
+    }
+
+    function openStats() {
+        const body = document.getElementById('stats-body');
+        const modes = [
+            { label: '1 vs 1', key: 'm1v1' },
+            { label: '1 vs 2', key: 'm1v2' },
+            { label: '1 vs 3', key: 'm1v3' }
+        ];
+        body.innerHTML = modes.map(m => `
+            <tr>
+                <td>${m.label}</td>
+                <td style="color:#0f0">${stats[m.key].wins}</td>
+                <td style="color:#f44">${stats[m.key].losses}</td>
+                <td>${stats[m.key].draws}</td>
+            </tr>
+        `).join('');
+        document.getElementById('m-best-streak').innerText = stats.overall.bestStreak;
+        document.getElementById('stats-modal').style.display = 'flex';
+    }
+
+    function closeStats() { document.getElementById('stats-modal').style.display = 'none'; }
+    function playerDraw() { if(turn === 0 && deck.length > 0 && !pendingMove) { players[0].hand.push(deck.pop()); updateUI(); } }
+    function passTurn() { if(turn === 0) nextTurn(); }
+
+    updateTopStats();
+</script>
+</body>
+</html>
